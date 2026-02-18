@@ -1,0 +1,34 @@
+# Papilio Retrocade Constraint File
+# Module: papilio_wishbone_hdmi (video_top_modular)
+# Board: Papilio Retrocade (GW2A-18C)
+# FPGA Bank: Bank 1 (1.8V LVCMOS18D differential)
+
+# ==============================================================================
+# HDMI TMDS Differential Clock Pair
+# ==============================================================================
+IO_LOC "O_tmds_clk_p" P6,T6;
+IO_PORT "O_tmds_clk_p" IO_TYPE=LVCMOS18D PULL_MODE=NONE DRIVE=8;
+
+# ==============================================================================
+# HDMI TMDS Differential Data Pairs
+# Channel 0 = Blue
+# Channel 1 = Green
+# Channel 2 = Red
+# ==============================================================================
+IO_LOC "O_tmds_data_p[0]" M6,T8;
+IO_PORT "O_tmds_data_p[0]" IO_TYPE=LVCMOS18D PULL_MODE=NONE DRIVE=8;
+
+IO_LOC "O_tmds_data_p[1]" T11,P11;
+IO_PORT "O_tmds_data_p[1]" IO_TYPE=LVCMOS18D PULL_MODE=NONE DRIVE=8;
+
+IO_LOC "O_tmds_data_p[2]" T12,R11;
+IO_PORT "O_tmds_data_p[2]" IO_TYPE=LVCMOS18D PULL_MODE=NONE DRIVE=8;
+
+# ==============================================================================
+# Notes:
+# - Uses LVCMOS18D (1.8V differential LVDS-compatible)
+# - First pin in pair is positive (_p), second is negative (_n) - implicit
+# - The _n outputs are driven automatically by ELVDS_OBUF primitives
+#   in hdmi_phy_720p.v when the differential signal type is used
+# - Verify bank voltage is set to 1.8V in your project configuration
+# ==============================================================================
