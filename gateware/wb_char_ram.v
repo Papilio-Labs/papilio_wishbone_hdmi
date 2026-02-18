@@ -38,8 +38,6 @@ module wb_char_ram (
     reg [4:0] cursor_y;       // 0x22 (0-29)
     reg [7:0] default_attr;   // 0x23 (foreground/background color)
     reg [11:0] ram_addr_ptr;  // Auto-increment pointer for RAM access
-    reg [5:0] font_addr;      // 0x2A Custom font address
-    reg [7:0] font_data_reg;  // 0x2B Custom font data register
     reg [5:0] font_addr;      // 0x0A: Custom font address (0-63)
     reg [7:0] font_data_reg;  // 0x0B: Custom font data
     

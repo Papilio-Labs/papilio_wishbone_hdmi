@@ -45,13 +45,17 @@ except ImportError:
 GATEWARE_DIR = _lib_root / "gateware"
 
 # Modules under test — add the DUT sources for each testbench
+_SIM_STUBS = str(_this_dir / "gowin_sim_stubs.v")
+
 TESTBENCH_SOURCES = {
+    # wb_video_ctrl instantiates video_top_wb (Gowin TMDS); use the sim stub
     "tb_wb_video_ctrl.v": [
+        _SIM_STUBS,
         str(GATEWARE_DIR / "wb_video_ctrl.v"),
-        str(GATEWARE_DIR / "video_top_wb.v"),   # may be in archive; stub if absent
-        str(GATEWARE_DIR / "testpattern.v"),
     ],
+    # wb_char_ram references char_ram_dpb which uses Gowin DPB primitive; use stub
     "tb_wb_char_ram.v": [
+        _SIM_STUBS,
         str(GATEWARE_DIR / "wb_char_ram.v"),
         str(GATEWARE_DIR / "char_ram_8x8.v"),
         str(GATEWARE_DIR / "char_ram_dpb.v"),
