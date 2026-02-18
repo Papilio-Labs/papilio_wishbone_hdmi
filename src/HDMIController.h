@@ -4,9 +4,13 @@
 #include <Arduino.h>
 #include <SPI.h>
 
-// SPI Wishbone Protocol Commands
+// SPI Wishbone Protocol Commands (guarded — also defined in WishboneSPI.h)
+#ifndef CMD_WRITE
 #define CMD_WRITE 0x01
+#endif
+#ifndef CMD_READ
 #define CMD_READ  0x02
+#endif
 
 // 8-bit Wishbone Register Addresses - RGB LED (0x8100-0x810F)
 #define REG_LED_GREEN  0x8100
