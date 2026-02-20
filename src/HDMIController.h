@@ -139,6 +139,8 @@ private:
   uint8_t _clk, _mosi, _miso;
   bool _useSharedBus;    // true = route through global wishboneWrite8/Read8
   uint16_t _baseAddress; // offset added to all addresses in shared-bus mode
+  // Burst write: sequential bytes with auto-incrementing address (one SPI transaction)
+  void wishboneWriteBurst8(uint16_t address, const uint8_t* data, uint16_t count);
   void wishboneWrite(uint32_t address, uint32_t data);
   uint32_t wishboneRead(uint32_t address);
 };

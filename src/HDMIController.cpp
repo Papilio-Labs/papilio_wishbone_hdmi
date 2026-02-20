@@ -266,14 +266,11 @@ void HDMIController::enableFramebuffer() {
 }
 
 void HDMIController::clearFramebuffer(uint8_t color) {
-  // Write color to all 19,200 pixels (160 x 120)
-  // Using direct byte addressing (pixel index = address offset)
-  for (uint16_t y = 0; y < FB_HEIGHT; y++) {
-    for (uint16_t x = 0; x < FB_WIDTH; x++) {
-      uint16_t pixelIndex = y * FB_WIDTH + x;
-      uint16_t addr = FB_BASE_ADDR + pixelIndex;  // Direct byte addressing
-      wishboneWrite8(addr, color);
-    }
+  // One burst per row (160 bytes) — 120 transactions instead of 19,200
+  uint8_t buf[FB_WIDTH];
+  memset(buf, color, FB_WIDTH);
+  for (uint8_t y = 0; y < FB_HEIGHT; y++) {
+    wishboneWriteBurst8(FB_BASE_ADDR + (uint16_t)y * FB_WIDTH, buf, FB_WIDTH);
   }
 }
 
@@ -285,35 +282,66 @@ void HDMIController::setPixel(uint8_t x, uint8_t y, uint8_t color) {
 }
 
 void HDMIController::fillRect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t color) {
+  if (x >= FB_WIDTH || y >= FB_HEIGHT) return;
+  uint8_t clampW = (x + w > FB_WIDTH) ? (FB_WIDTH - x) : w;
+  uint8_t buf[FB_WIDTH];  // worst-case row width
+  memset(buf, color, clampW);
   for (uint8_t py = y; py < y + h && py < FB_HEIGHT; py++) {
-    for (uint8_t px = x; px < x + w && px < FB_WIDTH; px++) {
-      setPixel(px, py, color);
-    }
+    wishboneWriteBurst8(FB_BASE_ADDR + (uint16_t)py * FB_WIDTH + x, buf, clampW);
   }
 }
 
 void HDMIController::drawColorBars() {
   // RGB332 colors for standard color bars
-  const uint8_t colors[8] = {
-    0xFF,  // White  (111 111 11)
-    0xFC,  // Yellow (111 111 00)
-    0x1F,  // Cyan   (000 111 11)
-    0x1C,  // Green  (000 111 00)
-    0xE3,  // Magenta(111 000 11)
-    0xE0,  // Red    (111 000 00)
-    0x03,  // Blue   (000 000 11)
-    0x00   // Black  (000 000 00)
+  static const uint8_t colors[8] = {
+    0xFF,  // White
+    0xFC,  // Yellow
+    0x1F,  // Cyan
+    0x1C,  // Green
+    0xE3,  // Magenta
+    0xE0,  // Red
+    0x03,  // Blue
+    0x00   // Black
   };
-  
+
+  // Build one row pattern, then burst the same row for all 120 lines
+  // 120 burst transactions instead of 19,200 individual writes
   const uint8_t barWidth = FB_WIDTH / 8;  // 20 pixels per bar
-  
-  for (uint8_t y = 0; y < FB_HEIGHT; y++) {
-    for (uint8_t x = 0; x < FB_WIDTH; x++) {
-      uint8_t barIndex = x / barWidth;
-      if (barIndex > 7) barIndex = 7;
-      setPixel(x, y, colors[barIndex]);
-    }
+  uint8_t rowBuf[FB_WIDTH];
+  for (uint8_t x = 0; x < FB_WIDTH; x++) {
+    uint8_t barIndex = x / barWidth;
+    if (barIndex > 7) barIndex = 7;
+    rowBuf[x] = colors[barIndex];
   }
+
+  for (uint8_t y = 0; y < FB_HEIGHT; y++) {
+    wishboneWriteBurst8(FB_BASE_ADDR + (uint16_t)y * FB_WIDTH, rowBuf, FB_WIDTH);
+  }
+}
+
+// Burst write: one SPI transaction for 'count' sequential bytes
+void HDMIController::wishboneWriteBurst8(uint16_t address, const uint8_t* data, uint16_t count) {
+  if (_useSharedBus) {
+    ::wishboneWriteBurst8(_baseAddress + address, data, count);
+    return;
+  }
+
+  if (!_spi || count == 0) return;
+
+  _spi->beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
+  digitalWrite(_cs, LOW);
+
+  _spi->transfer(CMD_BURST_WRITE_8);          // Burst write 8-bit command
+  _spi->transfer((address >> 8) & 0xFF);      // Address high byte
+  _spi->transfer(address & 0xFF);             // Address low byte
+  _spi->transfer((count >> 8) & 0xFF);        // Count high byte
+  _spi->transfer(count & 0xFF);               // Count low byte
+  for (uint16_t i = 0; i < count; i++) {
+    _spi->transfer(data[i]);
+  }
+
+  digitalWrite(_cs, HIGH);
+  _spi->endTransaction();
 }
 
 // 32-bit write
