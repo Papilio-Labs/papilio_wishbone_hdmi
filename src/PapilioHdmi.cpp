@@ -5,7 +5,13 @@
 PapilioHdmi::PapilioHdmi(uint16_t baseAddress)
     : _baseAddress(baseAddress), _ctrl(nullptr)
 {
-    _ctrl = new HDMIController();
+    if (baseAddress != 0x0000) {
+        // Shared-bus mode: route through global WishboneSPI at given base address
+        _ctrl = new HDMIController(baseAddress);
+    } else {
+        // Legacy dedicated SPI mode
+        _ctrl = new HDMIController();
+    }
 }
 
 bool PapilioHdmi::begin() {

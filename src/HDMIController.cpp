@@ -1,10 +1,17 @@
 #include "HDMIController.h"
+#include <WishboneSPI.h>  // for shared-bus global functions
 
 HDMIController::HDMIController(SPIClass* spi, uint8_t csPin, uint8_t spiClk, uint8_t spiMosi, uint8_t spiMiso)
-  : _spi(spi), _ownSpi(false), _cs(csPin), _clk(spiClk), _mosi(spiMosi), _miso(spiMiso) {
+  : _spi(spi), _ownSpi(false), _cs(csPin), _clk(spiClk), _mosi(spiMosi), _miso(spiMiso),
+    _useSharedBus(false), _baseAddress(0x0000) {
   if (_spi == nullptr) {
     _ownSpi = true; // will create in begin()
   }
+}
+
+HDMIController::HDMIController(uint16_t baseAddress)
+  : _spi(nullptr), _ownSpi(false), _cs(0), _clk(0), _mosi(0), _miso(0),
+    _useSharedBus(true), _baseAddress(baseAddress) {
 }
 
 HDMIController::~HDMIController() {
@@ -15,6 +22,11 @@ HDMIController::~HDMIController() {
 }
 
 void HDMIController::begin() {
+  if (_useSharedBus) {
+    // Shared-bus mode: SPI already initialised by wishboneInit(); nothing to set up
+    return;
+  }
+
   if (_spi == nullptr && _ownSpi) {
     _spi = new SPIClass(HSPI);
   }
@@ -93,6 +105,11 @@ uint8_t HDMIController::getVideoStatus() {
 
 // 8-bit wishbone write
 void HDMIController::wishboneWrite8(uint16_t address, uint8_t data) {
+  if (_useSharedBus) {
+    ::wishboneWrite8(_baseAddress + address, data);
+    return;
+  }
+
   if (!_spi) return;
 
   _spi->beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
@@ -109,6 +126,10 @@ void HDMIController::wishboneWrite8(uint16_t address, uint8_t data) {
 
 // 8-bit wishbone read
 uint8_t HDMIController::wishboneRead8(uint16_t address) {
+  if (_useSharedBus) {
+    return ::wishboneRead8(_baseAddress + address);
+  }
+
   uint8_t data = 0;
   if (!_spi) return data;
 
@@ -130,10 +151,13 @@ uint8_t HDMIController::wishboneRead8(uint16_t address) {
 // ============= Text Mode Functions =============
 
 void HDMIController::enableTextMode() {
-  setVideoPattern(PATTERN_TEXT_MODE);
+  // Switch master video mode mux to text mode (REG_VIDEO_MODE = 0x0000, value 0x01)
+  setVideoMode(VIDEO_MODE_TEXT);
 }
 
 void HDMIController::disableTextMode() {
+  // Restore master video mode to test pattern and reset to color bars
+  setVideoMode(VIDEO_MODE_TEST_PATTERN);
   setVideoPattern(PATTERN_COLOR_BARS);
 }
 
