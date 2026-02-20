@@ -65,14 +65,6 @@ void PapilioHdmiOS::handleTutorial(int argc, char** argv) {
     if (!tutorialStep(5, "Switch to text mode",
                       "hdmi pattern 3")) return;
 
-    // Step 5b: Framebuffer demo
-    if (!tutorialStep(11, "Switch to framebuffer mode and draw color bars (160x120 RGB332)",
-                      "hdmi fb bars")) return;
-
-    // Step 5c: Fill a region
-    if (!tutorialStep(12, "Fill a red rectangle in the top-left corner",
-                      "hdmi fb fill 0 0 40 30 0xE0")) return;
-
     // Step 6: Clear screen
     if (!tutorialStep(6, "Clear the screen",
                       "hdmi clear")) return;
@@ -92,6 +84,14 @@ void PapilioHdmiOS::handleTutorial(int argc, char** argv) {
     if (!tutorialStep(10, "Write a second line",
                       "hdmi text This is text mode!")) return;
 
+    // Step 11: Framebuffer demo
+    if (!tutorialStep(11, "Switch to framebuffer mode and draw color bars (160x120 RGB332)",
+                      "hdmi fb bars")) return;
+
+    // Step 12: Fill a region
+    if (!tutorialStep(12, "Fill a red rectangle in the top-left corner",
+                      "hdmi fb fill 0 0 40 30 0xE0")) return;
+
     Serial.println("\n========================================");
     Serial.println("   Tutorial Complete!");
     Serial.println("========================================\n");
@@ -100,6 +100,7 @@ void PapilioHdmiOS::handleTutorial(int argc, char** argv) {
     Serial.println("  - Check HDMI device status");
     Serial.println("  - Switch between test patterns");
     Serial.println("  - Use text mode with colors and cursor");
+    Serial.println("  - Use framebuffer mode (160x120 RGB332)");
     Serial.println("\nFor all commands, run: hdmi help");
 }
 
