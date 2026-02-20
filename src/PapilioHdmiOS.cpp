@@ -70,8 +70,8 @@ void PapilioHdmiOS::handleTutorial(int argc, char** argv) {
                       "hdmi clear")) return;
 
     // Step 7: Set text color
-    if (!tutorialStep(7, "Set text to white on blue (fg=15, bg=1)",
-                      "hdmi color 15 1")) return;
+    if (!tutorialStep(7, "Set text to white on light blue background (fg=15, bg=9)",
+                      "hdmi color 15 9")) return;
 
     // Step 8: Write text
     if (!tutorialStep(8, "Write a message to the screen",
