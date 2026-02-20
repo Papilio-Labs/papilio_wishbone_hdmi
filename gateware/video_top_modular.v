@@ -26,8 +26,8 @@ module video_top_modular
     input             I_wb_we         ,
     input             I_wb_stb        ,
     input             I_wb_cyc        ,
-    output reg        O_wb_ack        ,
-    output reg [7:0]  O_wb_dat        ,
+    output            O_wb_ack        ,
+    output     [7:0]  O_wb_dat        ,
     
     // HDMI output
     output            O_tmds_clk_p    ,
@@ -280,39 +280,41 @@ end
 // ==============================================================================
 // Wishbone Response Multiplexer
 // ==============================================================================
-wire mode_ack = wb_mode_sel && I_wb_stb && I_wb_cyc;
+// ACK and DAT are passed through combinationally from sub-modules.
+// Re-registering them (O_wb_ack <= text_ack) added an extra pipeline stage
+// that caused double-writes: the SPI bridge held STB high one cycle too long,
+// wb_video_text saw a new valid cycle after its own ACK went low, and wrote
+// the same character twice.
+//
+// Mode register gets its own single-cycle ACK generator (mode_ack_r).
+
+reg mode_ack_r;
+reg [1:0] video_mode_reg;  // rename internal to avoid port collision
 
 always @(posedge I_wb_clk or negedge I_rst_n) begin
     if (!I_rst_n) begin
-        video_mode <= 2'd0;
-        O_wb_ack <= 1'b0;
-        O_wb_dat <= 8'd0;
+        video_mode   <= 2'd0;
+        mode_ack_r   <= 1'b0;
     end else begin
-        // Mode register access
-        if (wb_mode_sel && I_wb_stb && I_wb_cyc) begin
+        // Single-cycle ACK for mode register; guard prevents re-firing
+        mode_ack_r <= wb_mode_sel && I_wb_stb && I_wb_cyc && !mode_ack_r;
+        if (wb_mode_sel && I_wb_stb && I_wb_cyc && !mode_ack_r) begin
             if (I_wb_we)
                 video_mode <= I_wb_dat[1:0];
-            O_wb_dat <= {6'b0, video_mode};
-            O_wb_ack <= !O_wb_ack;
-        end
-        // Mux sub-module responses
-        else if (wb_tp_sel) begin
-            O_wb_ack <= tp_ack;
-            O_wb_dat <= tp_dat;
-        end
-        else if (wb_text_sel) begin
-            O_wb_ack <= text_ack;
-            O_wb_dat <= text_dat;
-        end
-        else if (wb_fb_sel) begin
-            O_wb_ack <= fb_ack;
-            O_wb_dat <= fb_dat;
-        end
-        else begin
-            O_wb_ack <= 1'b0;
-            O_wb_dat <= 8'd0;
         end
     end
 end
+
+// Combinational ACK mux — no extra register stage
+assign O_wb_ack = wb_mode_sel ? mode_ack_r :
+                  wb_tp_sel   ? tp_ack     :
+                  wb_text_sel ? text_ack   :
+                  wb_fb_sel   ? fb_ack     : 1'b0;
+
+// Combinational DAT mux
+assign O_wb_dat = wb_mode_sel ? {6'b0, video_mode} :
+                  wb_tp_sel   ? tp_dat              :
+                  wb_text_sel ? text_dat            :
+                  wb_fb_sel   ? fb_dat              : 8'd0;
 
 endmodule
