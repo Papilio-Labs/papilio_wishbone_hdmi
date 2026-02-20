@@ -20,6 +20,7 @@ void PapilioHdmiOS::registerCommands() {
     PapilioOS.registerCommand("hdmi", "clear",    handleClear,    "Clear screen in text mode");
     PapilioOS.registerCommand("hdmi", "color",    handleColor,    "Set text colors (fg [bg] 0-15): hdmi color 15 0");
     PapilioOS.registerCommand("hdmi", "cursor",   handleCursor,   "Set cursor position (x y): hdmi cursor 10 5");
+    PapilioOS.registerCommand("hdmi", "fb",        handleFb,       "Framebuffer mode: hdmi fb [clear|pixel|fill|bars]");
 }
 
 // ===========================================================================
@@ -63,6 +64,14 @@ void PapilioHdmiOS::handleTutorial(int argc, char** argv) {
     // Step 5: Enable text mode
     if (!tutorialStep(5, "Switch to text mode",
                       "hdmi pattern 3")) return;
+
+    // Step 5b: Framebuffer demo
+    if (!tutorialStep(11, "Switch to framebuffer mode and draw color bars (160x120 RGB332)",
+                      "hdmi fb bars")) return;
+
+    // Step 5c: Fill a region
+    if (!tutorialStep(12, "Fill a red rectangle in the top-left corner",
+                      "hdmi fb fill 0 0 40 30 0xE0")) return;
 
     // Step 6: Clear screen
     if (!tutorialStep(6, "Clear the screen",
@@ -134,6 +143,7 @@ bool PapilioHdmiOS::tutorialStep(int stepNum, const char* description,
         else if (strcmp(argv2[1], "clear")   == 0) handleClear  (argc2 - 1, &argv2[1]);
         else if (strcmp(argv2[1], "color")   == 0) handleColor  (argc2 - 1, &argv2[1]);
         else if (strcmp(argv2[1], "cursor")  == 0) handleCursor (argc2 - 1, &argv2[1]);
+        else if (strcmp(argv2[1], "fb")       == 0) handleFb     (argc2 - 1, &argv2[1]);
     }
 
     delay(1000);
@@ -153,12 +163,19 @@ void PapilioHdmiOS::handleHelp(int argc, char** argv) {
     Serial.println("  hdmi clear                 - Clear screen in text mode");
     Serial.println("  hdmi color <fg> [bg]       - Set text colors (0-15)");
     Serial.println("  hdmi cursor <x> <y>        - Set cursor position (0-79, 0-29)");
+    Serial.println("  hdmi fb                    - Enter framebuffer mode");
+    Serial.println("  hdmi fb bars               - Draw color-bar demo");
+    Serial.println("  hdmi fb clear [color]      - Clear framebuffer (color: RGB332 hex, default 0x00)");
+    Serial.println("  hdmi fb pixel <x> <y> <c> - Set pixel (x:0-159, y:0-119, c: RGB332)");
+    Serial.println("  hdmi fb fill <x> <y> <w> <h> <c> - Fill rectangle");
     Serial.println("\nColor values (0-15):");
     Serial.println("  0=Black  1=Blue    2=Green  3=Cyan");
     Serial.println("  4=Red    5=Magenta 6=Brown  7=Lt.Gray");
     Serial.println("  8=Dk.Gray 9=Lt.Blue 10=Lt.Green 11=Lt.Cyan");
     Serial.println("  12=Lt.Red 13=Lt.Magenta 14=Yellow 15=White");
-    Serial.println("\nVideo modes: use 'hdmi pattern 3' to enter text mode");
+    Serial.println("\nRGB332 color byte: bits [7:5]=R(0-7) [4:2]=G(0-7) [1:0]=B(0-3)");
+    Serial.println("  0xE0=Red  0x1C=Green  0x03=Blue  0xFF=White  0x00=Black");
+    Serial.println("\nVideo modes: 'hdmi pattern 3' = text, 'hdmi fb' = framebuffer");
 }
 
 // ===========================================================================
@@ -341,6 +358,85 @@ void PapilioHdmiOS::handleCursor(int argc, char** argv) {
 
     _instance->_device->setCursor(x, y);
     Serial.printf("Cursor set to (%d, %d)\n", x, y);
+}
+
+// ===========================================================================
+// Framebuffer
+// ===========================================================================
+
+void PapilioHdmiOS::handleFb(int argc, char** argv) {
+    if (!_instance || !_instance->_device) {
+        Serial.println("Error: HDMI device not initialized");
+        return;
+    }
+
+    PapilioHdmi* hdmi = _instance->_device;
+
+    // No subcommand: just switch to framebuffer mode
+    if (argc < 2) {
+        hdmi->enableFramebuffer();
+        Serial.println("Framebuffer mode enabled (160x120 RGB332)");
+        return;
+    }
+
+    const char* sub = argv[1];
+
+    // --- bars ---
+    if (strcmp(sub, "bars") == 0) {
+        hdmi->enableFramebuffer();
+        Serial.print("Drawing color bars...");
+        hdmi->drawColorBars();
+        Serial.println(" done");
+        return;
+    }
+
+    // --- clear [color] ---
+    if (strcmp(sub, "clear") == 0) {
+        uint8_t color = (argc >= 3) ? (uint8_t)strtol(argv[2], nullptr, 0) : 0x00;
+        hdmi->enableFramebuffer();
+        Serial.printf("Clearing framebuffer with color 0x%02X...", color);
+        hdmi->clearFramebuffer(color);
+        Serial.println(" done");
+        return;
+    }
+
+    // --- pixel <x> <y> <color> ---
+    if (strcmp(sub, "pixel") == 0) {
+        if (argc < 5) {
+            Serial.println("Usage: hdmi fb pixel <x> <y> <color>  (x:0-159, y:0-119, color: RGB332 e.g. 0xE0)");
+            return;
+        }
+        uint8_t x = (uint8_t)atoi(argv[2]);
+        uint8_t y = (uint8_t)atoi(argv[3]);
+        uint8_t c = (uint8_t)strtol(argv[4], nullptr, 0);
+        if (x >= 160 || y >= 120) {
+            Serial.println("Error: x must be 0-159, y must be 0-119");
+            return;
+        }
+        hdmi->setPixel(x, y, c);
+        Serial.printf("Pixel (%d,%d) = 0x%02X\n", x, y, c);
+        return;
+    }
+
+    // --- fill <x> <y> <w> <h> <color> ---
+    if (strcmp(sub, "fill") == 0) {
+        if (argc < 7) {
+            Serial.println("Usage: hdmi fb fill <x> <y> <w> <h> <color>  (color: RGB332 e.g. 0x1C)");
+            return;
+        }
+        uint8_t x = (uint8_t)atoi(argv[2]);
+        uint8_t y = (uint8_t)atoi(argv[3]);
+        uint8_t w = (uint8_t)atoi(argv[4]);
+        uint8_t h = (uint8_t)atoi(argv[5]);
+        uint8_t c = (uint8_t)strtol(argv[6], nullptr, 0);
+        Serial.printf("Filling rect (%d,%d) %dx%d color 0x%02X...", x, y, w, h, c);
+        hdmi->fillRect(x, y, w, h, c);
+        Serial.println(" done");
+        return;
+    }
+
+    Serial.println("Unknown fb subcommand. Options: bars, clear, pixel, fill");
+    Serial.println("Run 'hdmi help' for usage.");
 }
 
 #endif // ENABLE_PAPILIO_OS

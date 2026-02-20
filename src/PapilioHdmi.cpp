@@ -80,6 +80,30 @@ uint8_t PapilioHdmi::getCursorY() {
 }
 
 // ---------------------------------------------------------------------------
+// Framebuffer mode API
+// ---------------------------------------------------------------------------
+
+void PapilioHdmi::enableFramebuffer() {
+    if (_ctrl) _ctrl->enableFramebuffer();
+}
+
+void PapilioHdmi::clearFramebuffer(uint8_t color) {
+    if (_ctrl) _ctrl->clearFramebuffer(color);
+}
+
+void PapilioHdmi::setPixel(uint8_t x, uint8_t y, uint8_t color) {
+    if (_ctrl) _ctrl->setPixel(x, y, color);
+}
+
+void PapilioHdmi::fillRect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t color) {
+    if (_ctrl) _ctrl->fillRect(x, y, w, h, color);
+}
+
+void PapilioHdmi::drawColorBars() {
+    if (_ctrl) _ctrl->drawColorBars();
+}
+
+// ---------------------------------------------------------------------------
 // Status
 // ---------------------------------------------------------------------------
 

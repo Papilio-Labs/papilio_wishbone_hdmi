@@ -85,6 +85,30 @@ public:
     bool waitForFPGA(unsigned long timeoutMs = 5000);
 
     // -------------------------------------------------------------------------
+    // Framebuffer mode API (160x120 RGB332)
+    // -------------------------------------------------------------------------
+
+    // Switch to framebuffer video mode
+    void enableFramebuffer();
+
+    // Fill entire framebuffer with a single RGB332 color (default black)
+    void clearFramebuffer(uint8_t color = 0x00);
+
+    // Set a single pixel (x: 0-159, y: 0-119, color: RGB332)
+    void setPixel(uint8_t x, uint8_t y, uint8_t color);
+
+    // Fill a rectangle with a color (x/y/w/h in pixels)
+    void fillRect(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t color);
+
+    // Draw built-in color-bar demo pattern into the framebuffer
+    void drawColorBars();
+
+    // Convert r(0-7), g(0-7), b(0-3) to RGB332 byte
+    static uint8_t rgb332(uint8_t r, uint8_t g, uint8_t b) {
+        return HDMIController::rgb332(r, g, b);
+    }
+
+    // -------------------------------------------------------------------------
     // RGB LED helpers (also exposed on HDMIController for convenience)
     // -------------------------------------------------------------------------
     void setLEDColor(uint32_t color);

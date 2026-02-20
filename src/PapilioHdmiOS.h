@@ -41,6 +41,7 @@ private:
     static void handleClear(int argc, char** argv);
     static void handleColor(int argc, char** argv);
     static void handleCursor(int argc, char** argv);
+    static void handleFb(int argc, char** argv);
 
     // Tutorial helper: show step, prompt user, optionally execute command
     static bool tutorialStep(int stepNum, const char* description,
