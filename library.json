@@ -1,19 +1,186 @@
 {
-  "name": "papilio_hdmi",
+  "name": "papilio_wishbone_hdmi",
   "version": "0.1.0",
-  "author": "GadgetFactory",
-  "maintainer": "",
-  "sentence": "FPGA HDMI and RGB LED control over SPI/Wishbone for ESP32 (PlatformIO library)",
-  "paragraph": "Provides a simple API to control the Papilio Arcade Board FPGA HDMI test patterns and the RGB LED via a Wishbone-over-SPI interface.",
-  "website": "",
+  "keywords": ["hdmi", "video", "tmds", "wishbone", "papilio", "fpga", "720p", "text-mode"],
+  "description": "HDMI video output library for Papilio FPGA boards with 720p output, test patterns, text mode, framebuffer, and Wishbone/SPI interface.",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/Papilio-Labs/papilio_wishbone_hdmi.git"
   },
+  "authors": [
+    { "name": "Papilio Labs", "maintainer": true }
+  ],
   "license": "MIT",
   "frameworks": ["arduino"],
   "platforms": ["espressif32"],
-  "dependencies": {
-    "adafruit/Adafruit GFX Library": "^1.11.0"
+  "dependencies": [
+    {
+      "name": "papilio_wishbone_bus",
+      "version": "*"
+    },
+    {
+      "name": "papilio_spi_slave",
+      "version": "*"
+    },
+    {
+      "name": "adafruit/Adafruit GFX Library",
+      "version": "^1.11.0"
+    },
+    {
+      "name": "papilio_os",
+      "version": "*",
+      "optional": true
+    }
+  ],
+  "export": {
+    "include": [
+      "src/*.h",
+      "src/*.cpp",
+      "gateware/*.v",
+      "gateware/constraints/*.cst",
+      "README.md",
+      "AI_SKILL.md"
+    ]
+  },
+  "papilio": {
+    "version": "1.0",
+    "gateware": {
+      "modules": [
+        {
+          "name": "hdmi_phy_720p",
+          "file": "gateware/hdmi_phy_720p.v",
+          "description": "Shared HDMI physical layer: PLL, timing, TMDS, serializers (required dependency)",
+          "parameters": [],
+          "is_dependency": true
+        },
+        {
+          "name": "tmds_encoder",
+          "file": "gateware/tmds_encoder.v",
+          "description": "Open-source TMDS 8b/10b encoder with DC balance (required dependency)",
+          "parameters": [],
+          "is_dependency": true
+        },
+        {
+          "name": "TMDS_rPLL",
+          "file": "gateware/TMDS_rPLL.v",
+          "description": "PLL wrapper: 27MHz -> 371.25MHz serial, 74.25MHz pixel (required dependency)",
+          "parameters": [],
+          "is_dependency": true
+        },
+        {
+          "name": "wb_video_testpattern",
+          "file": "gateware/wb_video_testpattern.v",
+          "description": "Test pattern generator (color bars, grid, grayscale) with Wishbone interface",
+          "parameters": []
+        },
+        {
+          "name": "wb_video_text",
+          "file": "gateware/wb_video_text.v",
+          "description": "80x26 text mode with 16 colors, cursor, auto-advance",
+          "parameters": []
+        },
+        {
+          "name": "wb_video_framebuffer",
+          "file": "gateware/wb_video_framebuffer.v",
+          "description": "160x120 RGB332 framebuffer scaled to 720p",
+          "parameters": []
+        },
+        {
+          "name": "video_top_modular",
+          "file": "gateware/video_top_modular.v",
+          "description": "Full top-level: all video modes with runtime switching via Wishbone (canonical top)",
+          "dependencies": [
+            "hdmi_phy_720p",
+            "tmds_encoder",
+            "TMDS_rPLL",
+            "wb_video_testpattern",
+            "wb_video_text",
+            "wb_video_framebuffer"
+          ],
+          "ports": {
+            "I_clk": "27MHz system clock",
+            "I_rst_n": "Active-low reset",
+            "I_wb_clk": "Wishbone clock",
+            "I_wb_adr": "Wishbone address (16-bit)",
+            "I_wb_dat": "Wishbone data input (8-bit)",
+            "I_wb_we": "Wishbone write enable",
+            "I_wb_stb": "Wishbone strobe",
+            "I_wb_cyc": "Wishbone cycle",
+            "O_wb_ack": "Wishbone acknowledge",
+            "O_wb_dat": "Wishbone data output (8-bit)",
+            "O_tmds_clk_p": "HDMI TMDS clock positive",
+            "O_tmds_clk_n": "HDMI TMDS clock negative",
+            "O_tmds_data_p": "HDMI TMDS data positive [2:0]",
+            "O_tmds_data_n": "HDMI TMDS data negative [2:0]"
+          },
+          "template": "    video_top_modular u_hdmi (\n        .I_clk(clk),\n        .I_rst_n(rst_n),\n        .I_wb_clk(wb_clk),\n        .I_wb_adr(wb_adr),\n        .I_wb_dat(wb_dat_w),\n        .I_wb_we(wb_we),\n        .I_wb_stb(${INSTANCE}_wb_stb),\n        .I_wb_cyc(wb_cyc),\n        .O_wb_ack(${INSTANCE}_wb_ack),\n        .O_wb_dat(${INSTANCE}_wb_dat),\n        .O_tmds_clk_p(O_tmds_clk_p),\n        .O_tmds_clk_n(O_tmds_clk_n),\n        .O_tmds_data_p(O_tmds_data_p),\n        .O_tmds_data_n(O_tmds_data_n)\n    );"
+        }
+      ]
+    },
+    "wishbone": {
+      "type": "slave",
+      "address_range": "auto",
+      "address_size": 32768,
+      "data_width": 8,
+      "registers": [
+        {
+          "offset": 0,
+          "name": "VIDEO_MODE",
+          "description": "Video mode select: 0=test-pattern, 1=text, 2=framebuffer"
+        },
+        {
+          "offset": 16,
+          "name": "TP_PATTERN",
+          "description": "Test pattern select: 0=color-bars, 1=grid, 2=grayscale"
+        },
+        {
+          "offset": 17,
+          "name": "TP_STATUS",
+          "description": "Test pattern status/version"
+        },
+        {
+          "offset": 32,
+          "name": "TEXT_CONTROL",
+          "description": "Text mode control (bit 0: clear screen, bit 1: cursor enable)"
+        },
+        {
+          "offset": 33,
+          "name": "TEXT_CURSOR_X",
+          "description": "Text cursor X position (0-79)"
+        },
+        {
+          "offset": 34,
+          "name": "TEXT_CURSOR_Y",
+          "description": "Text cursor Y position (0-29)"
+        },
+        {
+          "offset": 35,
+          "name": "TEXT_ATTR",
+          "description": "Text attribute byte [7:4]=bg color, [3:0]=fg color"
+        },
+        {
+          "offset": 36,
+          "name": "TEXT_CHAR",
+          "description": "Write character at cursor position (auto-advance)"
+        },
+        {
+          "offset": 256,
+          "name": "FB_BASE",
+          "description": "Framebuffer base address (160x120 RGB332, word-aligned)"
+        }
+      ]
+    },
+    "esp32": {
+      "class_name": "PapilioHdmi",
+      "headers": ["PapilioHdmi.h"],
+      "constructor_args": "${BASE_ADDR}",
+      "init_code": "    if (!${INSTANCE}.begin()) {\n        Serial.println(\"Failed to initialize HDMI\");\n    }",
+      "cli": {
+        "enabled": true,
+        "os_header": "PapilioHdmiOS.h",
+        "os_class": "PapilioHdmiOS",
+        "constructor_code": "    static PapilioHdmiOS ${INSTANCE}_os(&${INSTANCE});"
+      }
+    }
   }
 }

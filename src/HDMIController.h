@@ -4,9 +4,13 @@
 #include <Arduino.h>
 #include <SPI.h>
 
-// SPI Wishbone Protocol Commands
+// SPI Wishbone Protocol Commands (guarded — also defined in WishboneSPI.h)
+#ifndef CMD_WRITE
 #define CMD_WRITE 0x01
+#endif
+#ifndef CMD_READ
 #define CMD_READ  0x02
+#endif
 
 // 8-bit Wishbone Register Addresses - RGB LED (0x8100-0x810F)
 #define REG_LED_GREEN  0x8100
@@ -22,7 +26,8 @@
 #define REG_VIDEO_STATUS   0x0011
 
 // 8-bit Wishbone Register Addresses - Character RAM (0x0020-0x00FF)
-#define REG_CHARRAM_CONTROL   0x0020
+// Note: 0x0020 is local 0x00 (default/unused). Clear screen is at local 0x0A = 0x002A.
+#define REG_CHARRAM_CONTROL   0x002A  // Write any value to trigger clear screen (local reg 0x0A)
 #define REG_CHARRAM_CURSOR_X  0x0021
 #define REG_CHARRAM_CURSOR_Y  0x0022
 #define REG_CHARRAM_ATTR      0x0023
@@ -71,7 +76,13 @@
 
 class HDMIController {
 public:
+  // Dedicated SPI mode (legacy / standalone)
   HDMIController(SPIClass* spi = nullptr, uint8_t csPin = 10, uint8_t spiClk = 12, uint8_t spiMosi = 11, uint8_t spiMiso = 9);
+
+  // Shared-bus mode: uses global wishboneWrite8/wishboneRead8 with baseAddress offset
+  // baseAddress is added to every register address (e.g. 0x2000 for extended tier)
+  explicit HDMIController(uint16_t baseAddress);
+
   ~HDMIController();
 
   void begin();
@@ -126,6 +137,10 @@ private:
   bool _ownSpi;
   uint8_t _cs;
   uint8_t _clk, _mosi, _miso;
+  bool _useSharedBus;    // true = route through global wishboneWrite8/Read8
+  uint16_t _baseAddress; // offset added to all addresses in shared-bus mode
+  // Burst write: sequential bytes with auto-incrementing address (one SPI transaction)
+  void wishboneWriteBurst8(uint16_t address, const uint8_t* data, uint16_t count);
   void wishboneWrite(uint32_t address, uint32_t data);
   uint32_t wishboneRead(uint32_t address);
 };
